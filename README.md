@@ -53,3 +53,6 @@ eval $(docker-machine env --unset)  # переключение обратно н
 
 6. docker-machine rm docker-host
    yc compute instance delete docker-host
+
+
+docker-machine env --shell cmd docker-host
