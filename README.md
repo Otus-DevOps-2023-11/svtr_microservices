@@ -53,3 +53,31 @@ eval $(docker-machine env --unset)  # переключение обратно н
 
 6. docker-machine rm docker-host
    yc compute instance delete docker-host
+
+
+docker-machine env --shell cmd docker-host
+
+
+ДЗ 14 / Микросервисы
+1.
+docker pull mongo:4
+docker build -t svtr/post:1.0 ./post-py
+docker build -t svtr/comment:1.0 ./comment
+docker build -t svtr/ui:1.0 ./ui
+2.
+docker network create reddit
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:4
+docker run -d --network=reddit --network-alias=post svtr/post:1.0
+docker run -d --network=reddit --network-alias=comment svtr/comment:1.0
+docker run -d --network=reddit -p 9292:9292 svtr/ui:1.0
+
+http://158.160.60.248:9292/
+3.
+docker run --rm -i hadolint/hadolint < Dockerfile
+4.
+docker run -d --network=reddit --network-alias=post_db --network-alias=comment_db mongo:4
+docker run -d --network=reddit --network-alias=post svtr/post:2.0
+docker run -d --network=reddit --network-alias=comment svtr/comment:1.0
+docker run -d --network=reddit -p 9292:9292 svtr/ui:2.0
+
+http://158.160.60.248:9292/
