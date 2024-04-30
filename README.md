@@ -133,3 +133,95 @@ services:
     volumes:
       - ./post-py/:/app/
 ```
+
+====================
+Домашнее задание №16:
+====================
+
+## В процессе сделано:
+
+    Кратко:
+    Отработаны все задания в соотвествии с документом к ДЗ
+        Подготовить инсталляцию Gitlab CI
+        Подготовить репозиторий с кодом приложения
+        Описать для приложения этапы пайплайна
+        Определить окружения
+    * Кроме заданий со *
+
+## Как запустить проект:
+
+        Основное. Создание ВМ для DZ
+        > yc compute instance create \
+            --name gitlab-ci-vm \
+            --hostname gitlab-ci-vm \
+            --memory=8 \
+            --cores=2 \
+            --create-boot-disk image-folder-id=standard-images,image-family=ubuntu-1804-lts,size=50GB \
+            --network-interface subnet-name=default-ru-central1-a,nat-ip-version=ipv4 \
+            --metadata serial-port-enable=1 \
+            --metadata-from-file='user-data=ya_gitlab-ci-vm_startup.yaml'
+
+        Подготовить докер на ней-
+        > docker-machine create \
+            --driver generic \
+            --generic-ip-address=51.250.7.249 \
+                    --generic-ssh-user ap1 \
+                    --generic-ssh-key ~/.ssh/id_rsa \
+                    gitlab-ci-vm
+        docker-machine ls
+        eval $(docker-machine env gitlab-ci-vm)
+
+        На хосте с докером подготовиться, развернуть контейнер для Gitlab
+            mkdir -p /srv/gitlab/config /srv/gitlab/data /srv/gitlab/logs
+            cd /srv/gitlab
+            touch docker-compose.yml
+            vi docker-compose.yml
+            cat docker-compose.yml
+                        web:
+                          image: 'gitlab/gitlab-ce:latest'
+                          restart: always
+                          hostname: 'gitlab.example.com'
+                          environment:
+                            GITLAB_OMNIBUS_CONFIG: |
+                              external_url 'http://51.250.7.249'
+                          ports:
+                            - '80:80'
+                            - '443:443'
+                            - '2222:22'
+                          volumes:
+                            - '/srv/gitlab/config:/etc/gitlab'
+                            - '/srv/gitlab/logs:/var/log/gitlab'
+                            - '/srv/gitlab/data:/var/opt/gitlab'
+            apt install docker-compose
+            docker-compose up -d
+            sudo docker exec -it a6d06 grep 'Password:' /etc/gitlab/initial_root_password
+
+        Действия через вебинтерфейс Gitlab,
+        Первоночальные подстройки, настройки узеров, групп и проектов, проверки работы папйплайнов тут -
+            http://51.250.7.249/
+
+        Добавление раннера, на хосте
+            docker run -d --name gitlab-runner --restart always -v /srv/gitlab-runner/config:/etc/gitlab-runner -v /var/run/docker.sock:/var/run/docker.sock gitlab/gitlab-runner:latest
+        Регистрация раннера
+            docker exec -it gitlab-runner gitlab-runner register \
+                --url http://51.250.7.249/ \
+                --non-interactive \
+                --locked=false \
+                --name DockerRunner \
+                --executor docker \
+                --docker-image alpine:latest \
+                --registration-token XXXXXXXNNNNNNNNNNDDDDDDDDD \
+                --tag-list "linux,xenial,ubuntu,docker" \
+                --run-untagged
+                !!! ..... 'register' command has been deprecated ...., но пока работает
+
+        Работа локально с гитом
+            git remote add gitlab http://51.250.7.249/homework/example.git
+            git push gitlab gitlab-ci-1
+            Работа по настройке pipeline, в разных вариантах, в файле.gitlab-ci.yml
+            подготовка тестового проекта, работа с "окружениями" и тп
+            и др.
+
+## Как проверить работоспособность:
+
+        Например, перейти по ссылке Gitlab http://51.250.7.249/homework/example,  ссылки Pipeline, Enviroment и др
