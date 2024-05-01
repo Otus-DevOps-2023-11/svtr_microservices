@@ -1,0 +1,38 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Chart.Name }}
+  labels:
+    app: reddit
+    component: mongodb
+    comment-db: "true"
+    post-db: "true"
+    release: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reddit
+      component: mongodb
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      name: mongo
+      labels:
+        app: reddit
+        component: mongodb
+        comment-db: "true"
+        post-db: "true"
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+      - image: mongo:4
+        name: mongodb
+        volumeMounts:
+        - name: mongo-data
+          mountPath: /data/db
+#TESTONLY
+      volumes:
+      - name: mongo-data
+        emptyDir: {}

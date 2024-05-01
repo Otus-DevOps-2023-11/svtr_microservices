@@ -1,0 +1,6 @@
+name: reddit
+description: OTUS sample reddit application
+maintainers:
+  - name: svtr
+    email: gazmeeva@mail.ru
+version: 0.1.0
