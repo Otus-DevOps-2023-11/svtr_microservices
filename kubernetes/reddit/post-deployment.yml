@@ -1,27 +1,18 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: post
-  labels:
-    app: reddit
-    component: post
+  name: post-deployment
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app: reddit
-      component: post
+      app: post
   template:
     metadata:
       name: post
       labels:
-        app: reddit
-        component: post
+        app: post
     spec:
       containers:
-      - image: svtr/post
-        name: post
-        env:
-        - name: POST_DATABASE_HOST
-          value: post-db
+        - image: svtr/post
+          name: post
