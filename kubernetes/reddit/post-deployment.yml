@@ -21,3 +21,6 @@ spec: # Блок спецификации деплоя
       containers:
         - image: svtr/post:logging
           name: post
+          env:
+          - name: POST_DATABASE_HOST
+            value: post-db
