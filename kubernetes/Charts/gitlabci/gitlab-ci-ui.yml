@@ -1,0 +1,130 @@
+---
+stages:
+  - build
+  - test
+  - release
+  - review
+  - cleanup
+
+build:
+  stage: build
+  tags:
+    - docker
+  only:
+    - branches
+  variables:
+    CI_REGISTRY: 'index.docker.io'
+    CI_APPLICATION_REPOSITORY: $CI_REGISTRY/$CI_PROJECT_PATH
+    CI_APPLICATION_TAG: $CI_COMMIT_REF_SLUG
+    CI_CONTAINER_NAME: ci_job_build_${CI_JOB_ID}
+  before_script:
+    - docker info
+    - echo "CI_REGISTRY_USER- $CI_REGISTRY_USER"
+  script:
+    # Building
+    - echo "Building Dockerfile-based application..."
+    - docker build -t "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" .
+    - if [[ -n "$CI_REGISTRY_USER" ]]; then echo "Logging to GitLab Container Registry with CI credentials...for build" ;  docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" ; fi
+    - echo "Pushing to GitLab Container Registry..."
+    - docker push "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
+
+test:
+  stage: test
+  script:
+    - exit 0
+  only:
+    - branches
+
+release:
+  stage: release
+  tags:
+    - docker
+  variables:
+    CI_REGISTRY: 'index.docker.io'
+    CI_APPLICATION_REPOSITORY: $CI_REGISTRY/$CI_PROJECT_PATH
+    CI_APPLICATION_TAG: $CI_COMMIT_REF_SLUG
+    CI_CONTAINER_NAME: ci_job_build_${CI_JOB_ID}
+  before_script:
+    - docker info
+    - echo "CI_REGISTRY_USER $CI_REGISTRY_USER"
+  script:
+    # Releasing
+    - echo "Updating docker images ..."
+    - if [[ -n "$CI_REGISTRY_USER" ]]; then echo "Logging to GitLab Container Registry with CI credentials...for build" ;  docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" ; fi
+    - docker pull "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG"
+    - docker tag "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" "$CI_APPLICATION_REPOSITORY:$(cat VERSION)"
+    - docker push "$CI_APPLICATION_REPOSITORY:$(cat VERSION)"
+    # latest is neede for feature flags
+    - docker tag "$CI_APPLICATION_REPOSITORY:$CI_APPLICATION_TAG" "$CI_APPLICATION_REPOSITORY:latest"
+    - docker push "$CI_APPLICATION_REPOSITORY:latest"
+  only:
+    - master
+
+review:
+  stage: review
+  variables:
+    KUBE_NAMESPACE: review
+    host: $CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+    CI_APPLICATION_TAG: $CI_COMMIT_REF_SLUG
+    name: $CI_ENVIRONMENT_SLUG
+    GITLAB_NAME_HOST: gitlab.example.ap.e4u.ru
+#
+    DOCKER_HOST: tcp://localhost:2375/
+    DOCKER_DRIVER: overlay2
+  image: alpine/helm:3.2.1
+  environment:
+    name: review/$CI_PROJECT_PATH/$CI_COMMIT_REF_NAME
+    url: http://$CI_PROJECT_PATH_SLUG-$CI_COMMIT_REF_SLUG
+    on_stop: stop_review
+  only:
+    refs:
+      - branches
+  except:
+    - master
+  before_script:
+    # installing dependencies
+    - apk add git
+    - helm version --client
+  script:
+    - helm ls -A
+    - export track="${1-stable}"
+    - if [[ "$track" != "stable" ]]; then name="$name-$track" ; fi
+    - echo "Clone deploy repository..."
+    - git clone http://$GITLAB_NAME_HOST/$CI_PROJECT_NAMESPACE/reddit-deploy.git
+    - echo "Download helm dependencies..."
+    - helm dep update reddit-deploy/reddit
+    - echo "Deploy helm release $name to $KUBE_NAMESPACE"
+    - echo "Upgrading existing release..."
+    - echo "helm upgrade --install --wait --set ui.ingress.host=$host --set $CI_PROJECT_NAME.image.tag=$CI_APPLICATION_TAG --namespace=$KUBE_NAMESPACE --version=$CI_PIPELINE_ID-$CI_JOB_ID $name reddit-deploy/reddit/"
+#    - helm upgrade --install --wait --set ui.ingress.host="$host" --set $CI_PROJECT_NAME.image.tag="$CI_APPLICATION_TAG" --namespace="$KUBE_NAMESPACE" --version="$CI_PIPELINE_ID-$CI_JOB_ID"  "$name" reddit-deploy/reddit/
+    - helm upgrade --install --wait --set ui.ingress.host=$host --set $CI_PROJECT_NAME.image.tag="$CI_APPLICATION_TAG" --namespace="$KUBE_NAMESPACE" --version="$CI_PIPELINE_ID-$CI_JOB_ID"  "$name" reddit-deploy/reddit/
+
+stop_review:
+  stage: cleanup
+  variables:
+    KUBE_NAMESPACE: review
+    GIT_STRATEGY: none
+    name: $CI_ENVIRONMENT_SLUG
+#
+    DOCKER_HOST: tcp://localhost:2375/
+    DOCKER_DRIVER: overlay2
+  environment:
+    name: review/$CI_PROJECT_PATH/$CI_COMMIT_REF_NAME
+    action: stop
+  image: alpine/helm:3.2.1
+  when: manual
+  allow_failure: true
+  only:
+    refs:
+      - branches
+  except:
+    - master
+  before_script:
+    # installing dependencies
+    - helm version --client
+  script:
+    - export track="${1-stable}"
+    - if [[ "$track" != "stable" ]]; then name="$name-$track" ; fi
+    - echo "helm delete $name --namespace=$KUBE_NAMESPACE"
+    - helm delete "$name" --namespace="$KUBE_NAMESPACE"
+...

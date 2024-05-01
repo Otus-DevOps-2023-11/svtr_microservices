@@ -1,0 +1,11 @@
+---
+service:
+  internalPort: 9292
+  externalPort: 9292
+
+image:
+  repository: svtr/comment
+  tag: "1.0"
+
+databaseHost:
+  ### !!!!
