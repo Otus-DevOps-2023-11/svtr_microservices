@@ -1,12 +1,13 @@
-apiVersion: apps/v1beta1
+---
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mongo
   labels:
     app: reddit
     component: mongo
-    post-db: "true"
     comment-db: "true"
+    post-db: "true"
 spec:
   replicas: 1
   selector:
@@ -19,16 +20,48 @@ spec:
       labels:
         app: reddit
         component: mongo
-        post-db: "true"
         comment-db: "true"
+        post-db: "true"
     spec:
       containers:
         - image: mongo:4
           name: mongo
           volumeMounts:
-            - name: mongo-persistent-storage
+            - name: mongo-data
               mountPath: /data/db
       volumes:
-        - name: mongo-persistent-storage
+        - name: mongo-data
+          # name: mongo-gce-pd-storage
           persistentVolumeClaim:
-            claimName:  mongo-pvc
+            claimName: mongo-pvc
+
+#        volumeMounts:
+#         - name: mongo-data
+#           mountPath: /data/db
+#      volumes:
+#      - name: mongo-data
+#        emptyDir: {}
+
+#name: mongo-persistent-storage
+
+##      hostAliases:
+##      - hostnames:
+##        - "postdb"
+##        - "commentdb"
+##        - "mongodb"
+##        ip: "10.244.69.200"
+#TEST:
+#      volumes:
+#      - name: mongo-data
+#        hostPath:
+#          path: "/data/db"
+#
+#ODLS
+#        volumes:
+#          - reddit_db:/data/db
+#        networks:
+#          default:
+#            aliases:
+#              - post_db
+#              - comment_db
+#              - mongo_db
